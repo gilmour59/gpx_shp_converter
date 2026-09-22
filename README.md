@@ -8,16 +8,33 @@ A user-friendly, local-only GPX to ESRI Shapefile converter.
 - Fixed output CRS: **EPSG:4326 / WGS 84**.
 - Consolidated mode: create one shapefile containing features from all GPX files.
 - Individual mode: create one shapefile for every GPX file.
+- Optional CSV attribute attachment using **GEOREF ID**.
+- Strict CSV validation: if any uploaded GPX filename is missing from GEOREF ID, conversion is blocked.
 - GPX track segments are exported as LineString geometries.
 - Source filename, track name, track number, segment number, and point count are preserved.
 - Shapefile components are packaged automatically into ZIP files.
 - Files are processed locally by the application.
+
+## CSV attribute matching
+
+When **Attach attributes from CSV** is enabled:
+
+1. The CSV must contain a column named **GEOREF ID**.
+2. Each uploaded GPX filename is matched to GEOREF ID using the filename without the .gpx extension.
+3. Example: **R06-79-02-008-000001.gpx** matches **R06-79-02-008-000001**.
+4. Every uploaded GPX must have a CSV match. If one or more are missing, the entire conversion is blocked.
+5. Extra rows in the CSV are allowed.
+6. Duplicate GEOREF IDs are reported as warnings. The first matching CSV row is currently used to avoid multiplying geometry.
+7. Matched CSV columns are written into the Shapefile DBF attributes.
+
+The app uses short DBF-safe aliases for long field names because the Shapefile format limits attribute field names.
 
 ## Tech stack
 
 - Python
 - Streamlit
 - gpxpy
+- pandas
 - GeoPandas
 - Shapely
 - Pyogrio / GDAL
