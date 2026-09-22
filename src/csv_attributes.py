@@ -132,6 +132,33 @@ def build_parcel_attribute_lookup(
             if csv_column in group.columns:
                 attributes[shp_column] = _first_nonempty(group[csv_column])
 
+        commodities = [
+            value.strip()
+            for value in group.get("COMMODITY", pd.Series(dtype=str)).astype(str)
+            if value.strip()
+        ]
+        plant_from = [
+            value.strip()
+            for value in group.get(
+                "PLANTING SCHEDULE - FROM",
+                pd.Series(dtype=str),
+            ).astype(str)
+            if value.strip()
+        ]
+        plant_to = [
+            value.strip()
+            for value in group.get(
+                "PLANTING SCHEDULE - TO",
+                pd.Series(dtype=str),
+            ).astype(str)
+            if value.strip()
+        ]
+
+        # Keep crop summaries directly visible in the shapefile while the
+        # related CSV preserves the exact one-to-many crop rows.
+        attributes["COMMODITY"] = "; ".join(dict.fromkeys(commodities))
+        attributes["PLANT_FROM"] = "; ".join(dict.fromkeys(plant_from))
+        attributes["PLANT_TO"] = "; ".join(dict.fromkeys(plant_to))
         attributes["CROP_ROWS"] = str(len(group))
         lookup[key] = attributes
 
