@@ -1,0 +1,14 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.streamlit/secrets.toml
+.DS_Store
+output/
+*.zip
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
