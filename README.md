@@ -37,7 +37,7 @@ When CSV attributes are enabled, the output ZIP contains:
 5. Extra CSV rows are allowed.
 6. Multiple rows for a matched GEOREF ID are valid and all are exported to **crop_records.csv**.
 
-Parcel-level attributes such as RSBSA ID, parcel ID, farm type, area, ownership, and location are written to the shapefile DBF. Commodity and planting schedule remain in the related crop table so the one-to-many relationship is not lost.
+Parcel-level attributes such as RSBSA ID, parcel ID, farm type, area, ownership, and location are written to the shapefile DBF. The shapefile also includes summary fields `COMMODITY`, `PLANT_FROM`, `PLANT_TO`, and `CROP_ROWS`, with multiple values joined by semicolons. The exact row-by-row crop and planting records are still preserved in `crop_records.csv`.
 
 ## Tech stack
 
@@ -66,3 +66,12 @@ When CSV attributes are used, the ZIP also includes **crop_records.csv**.
 ## CRS
 
 All outputs use **EPSG:4326 — WGS 84**.
+
+
+## Windows distribution
+
+End users do not need Python installed.
+
+For Windows, build the application once using `build_windows.bat`. It creates a PyInstaller one-folder package under `dist\GPX_SHP_Converter`. Distribute that entire folder to users. They can double-click `GPX_SHP_Converter.exe` or use `Run_GPX_SHP_Converter.bat`.
+
+See `WINDOWS_DISTRIBUTION.md` for details.
