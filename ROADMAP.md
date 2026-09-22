@@ -10,30 +10,35 @@ The output CRS is fixed to **EPSG:4326 / WGS 84**.
 
 - [x] Local Streamlit interface
 - [x] Multiple GPX upload
-- [x] GPX track segment to LineString conversion
+- [x] GPX track conversion
+- [x] One geometry per GPX/GEOREF ID
+- [x] Combine multiple track segments into one multipart feature
 - [x] EPSG:4326 / WGS 84 output
 - [x] Consolidated conversion
 - [x] Individual conversion
-- [x] Source filename and GPX track metadata
+- [x] Optional CSV attribute import by GEOREF ID
+- [x] Block conversion when any GPX filename is missing from CSV
+- [x] Support repeated GEOREF rows as one-to-many crop records
+- [x] Keep parcel-level attributes in the shapefile
+- [x] Export full crop/planting rows to crop_records.csv
 - [x] ZIP Shapefile components
-- [x] Basic validation and friendly errors
-- [x] Initial automated tests\n- [x] Optional CSV attribute import by GEOREF ID\n- [x] Block conversion when any GPX filename is missing from CSV
+- [x] Basic validation and automated tests
 
-## Phase 2 — User experience\n\n- [ ] Improve duplicate GEOREF ID conflict handling\n- [ ] Add CSV match summary table
+## Phase 2 — User experience
 
-- [ ] File summary table instead of one message per file
+- [ ] GPX-to-CSV match summary table
+- [ ] Crop-record count per GEOREF in preview
+- [ ] File summary table
 - [ ] Conversion progress indicator
 - [ ] Better duplicate filename handling
-- [ ] Clearer per-file warnings and partial-success summary
-- [ ] Remember last selected conversion mode during the local session
-- [ ] Add a simple help/about section
-- [ ] Add drag-and-drop examples and screenshots to README
+- [ ] Clearer partial-success/error summaries
+- [ ] Add screenshots and usage examples
 
 ## Phase 3 — GIS features
 
+- [ ] Optional closed-track to Polygon conversion
 - [ ] GPX routes to LineString
 - [ ] GPX waypoints to Point
-- [ ] Optional closed-track to Polygon conversion
 - [ ] Preserve elevation values
 - [ ] Preserve timestamps
 - [ ] Track length summary
@@ -43,12 +48,11 @@ The output CRS is fixed to **EPSG:4326 / WGS 84**.
 ## Phase 4 — Preview and quality control
 
 - [ ] Interactive local map preview
-- [ ] Show uploaded tracks using distinct map layers
-- [ ] Detect duplicate files
+- [ ] Show uploaded parcels as map layers
+- [ ] Detect duplicate uploaded GPX files
 - [ ] Coordinate plausibility warnings
 - [ ] Optional Philippines bounds warning
-- [ ] Detect suspiciously short or empty tracks
-- [ ] Preview feature attributes before export
+- [ ] Preview parcel and crop attributes before export
 
 ## Phase 5 — Distribution
 
@@ -57,4 +61,3 @@ The output CRS is fixed to **EPSG:4326 / WGS 84**.
 - [ ] Investigate PyInstaller packaging
 - [ ] Provide one-click local startup
 - [ ] Create release ZIP
-- [ ] Add release checklist
