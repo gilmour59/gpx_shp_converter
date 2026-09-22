@@ -18,9 +18,9 @@
 - [x] Streamlit interface
 - [x] Multiple GPX upload
 - [x] Basic file validation
-- [x] Basic automated tests
+- [x] Basic automated tests\n- [x] Optional CSV attribute attachment\n- [x] GPX filename to GEOREF ID matching\n- [x] Fail entire conversion if any GPX file is missing from CSV
 
-## Next
+## Next\n\n- [ ] Decide stricter policy for duplicate GEOREF IDs with conflicting attributes\n- [ ] Show a GPX-to-CSV match table before conversion
 
 - [ ] Test with real GPX files from actual field devices/apps
 - [ ] Confirm shapefiles open correctly in QGIS
