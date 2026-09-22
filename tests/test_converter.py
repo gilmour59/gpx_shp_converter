@@ -94,7 +94,9 @@ def test_shapefile_uses_parcel_attributes_and_related_table_keeps_crops():
     assert gdf.loc[0, "RSBSA_ID"] == "RSBSA-1"
     assert gdf.loc[0, "PARCEL_ID"] == "PARCEL-1"
     assert gdf.loc[0, "CROP_ROWS"] == "2"
-    assert "COMMODITY" not in gdf.columns
+    assert gdf.loc[0, "COMMODITY"] == "Rice/Palay; Corn"
+    assert gdf.loc[0, "PLANT_FROM"] == "June; January"
+    assert gdf.loc[0, "PLANT_TO"] == ""
     assert len(related) == 2
     assert set(related["COMMODITY"]) == {"Rice/Palay", "Corn"}
 
