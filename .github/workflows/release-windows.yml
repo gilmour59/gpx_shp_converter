@@ -1,4 +1,4 @@
-name: Build Windows Release
+name: Build Desktop Release
 
 on:
   push:
@@ -11,77 +11,87 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  build-windows:
     runs-on: windows-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Read release version
-        id: version
-        shell: pwsh
-        run: |
-          $version = (Get-Content RELEASE_VERSION -Raw).Trim()
-          if (-not $version.StartsWith("v")) { $version = "v$version" }
-          "version=$version" >> $env:GITHUB_OUTPUT
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-
       - name: Install dependencies
-        shell: pwsh
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
-
       - name: Run tests
         run: python -m pytest -q
-
-      - name: Build Windows application
+      - name: Build Windows package
         shell: pwsh
         run: |
           pyinstaller --noconfirm --clean --name "GPX_SHP_Converter" --onedir --collect-all streamlit --collect-all geopandas --collect-all pyogrio --collect-all pyproj --collect-all shapely --add-data "app.py;." --add-data "src;src" windows_launcher.py
           Copy-Item "Run_GPX_SHP_Converter.bat" "dist\GPX_SHP_Converter\Run_GPX_SHP_Converter.bat"
+          $version = (Get-Content RELEASE_VERSION -Raw).Trim()
+          if (-not $version.StartsWith("v")) { $version = "v$version" }
+          Compress-Archive -Path "dist\GPX_SHP_Converter\*" -DestinationPath "GPX_SHP_Converter_Windows_$version.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: GPX_SHP_Converter_Windows_*.zip
 
-      - name: Create release ZIP
-        shell: pwsh
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
         run: |
-          $version = "${{ steps.version.outputs.version }}"
-          $zipName = "GPX_SHP_Converter_Windows_$version.zip"
-          Compress-Archive -Path "dist\GPX_SHP_Converter\*" -DestinationPath $zipName
-          "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Build macOS package
+        shell: bash
+        run: |
+          pyinstaller --noconfirm --clean --name "GPX_SHP_Converter" --onedir --collect-all streamlit --collect-all geopandas --collect-all pyogrio --collect-all pyproj --collect-all shapely --add-data "app.py:." --add-data "src:src" macos_launcher.py
+          cp Run_GPX_SHP_Converter.command dist/GPX_SHP_Converter/Run_GPX_SHP_Converter.command
+          chmod +x dist/GPX_SHP_Converter/Run_GPX_SHP_Converter.command
+          chmod +x dist/GPX_SHP_Converter/GPX_SHP_Converter
+          VERSION=$(tr -d '\r\n ' < RELEASE_VERSION)
+          [[ "$VERSION" == v* ]] || VERSION="v$VERSION"
+          ditto -c -k --sequesterRsrc --keepParent dist/GPX_SHP_Converter "GPX_SHP_Converter_macOS_$VERSION.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-release
+          path: GPX_SHP_Converter_macOS_*.zip
 
+  publish:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
       - name: Publish GitHub Release
-        shell: pwsh
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $version = "${{ steps.version.outputs.version }}"
-          $notes = @"
-          ## GPX to SHP Converter $version
+          VERSION=$(tr -d '\r\n ' < RELEASE_VERSION)
+          [[ "$VERSION" == v* ]] || VERSION="v$VERSION"
+          gh release create "$VERSION" release-assets/* \
+            --target "$GITHUB_SHA" \
+            --title "GPX to SHP Converter $VERSION" \
+            --notes "Desktop release for Windows and macOS.
 
-          Windows local release.
+          For Windows: download the Windows ZIP, extract it, then open Run_GPX_SHP_Converter.bat or GPX_SHP_Converter.exe.
 
-          ### For end users
-          1. Download **$env:ZIP_NAME**.
-          2. Extract the ZIP to a folder.
-          3. Double-click **Run_GPX_SHP_Converter.bat** or **GPX_SHP_Converter.exe**.
-          4. The converter opens locally in the default web browser.
+          For macOS: download the macOS ZIP, extract it, then open Run_GPX_SHP_Converter.command. If macOS blocks it because it is unsigned, right-click the file, choose Open, then confirm.
 
-          Python does not need to be installed on the end-user computer.
-
-          ### Current features
-          - EPSG:4326 / WGS 84 output
-          - Consolidated or individual GPX-to-Shapefile conversion
-          - Optional CSV matching using GEOREF ID
-          - Every uploaded GPX must exist in the CSV when CSV mode is enabled
-          - One geometry per GPX / GEOREF ID
-          - Commodity and planting summaries in the shapefile
-          - Full crop/planting rows preserved in crop_records.csv
-          "@
-          gh release create $version $env:ZIP_NAME --target $env:GITHUB_SHA --title "GPX to SHP Converter $version" --notes $notes
+          Python does not need to be installed on end-user computers."
