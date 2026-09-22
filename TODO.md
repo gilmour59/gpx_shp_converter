@@ -19,6 +19,8 @@
 - [x] Treat repeated GEOREF rows as valid crop records
 - [x] Keep one geometry while preserving all crop rows
 - [x] Export crop_records.csv with the shapefile
+- [x] Add crop and planting summary fields to shapefile attributes
+- [x] Add Windows PyInstaller build and launcher files
 - [x] Automated tests for one-to-many crop records
 
 ## Next
