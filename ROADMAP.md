@@ -21,6 +21,7 @@ The output CRS is fixed to **EPSG:4326 / WGS 84**.
 - [x] Support repeated GEOREF rows as one-to-many crop records
 - [x] Keep parcel-level attributes in the shapefile
 - [x] Export full crop/planting rows to crop_records.csv
+- [x] Add COMMODITY / PLANT_FROM / PLANT_TO summaries to shapefile attributes
 - [x] ZIP Shapefile components
 - [x] Basic validation and automated tests
 
@@ -57,7 +58,8 @@ The output CRS is fixed to **EPSG:4326 / WGS 84**.
 ## Phase 5 — Distribution
 
 - [ ] Lock tested dependency versions
-- [ ] Add Windows launcher
+- [x] Add Windows launcher
+- [x] Add PyInstaller build script
 - [ ] Investigate PyInstaller packaging
 - [ ] Provide one-click local startup
 - [ ] Create release ZIP
