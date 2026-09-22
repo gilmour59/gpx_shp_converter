@@ -2,76 +2,147 @@
 
 A user-friendly, local-only GPX to ESRI Shapefile converter.
 
+## For end users
+
+You do **not** need Python installed if you use a packaged release.
+
+### Windows
+
+1. Open the latest GitHub Release.
+2. Download the file named similar to:
+   `GPX_SHP_Converter_Windows_vX.X.X.zip`
+3. Extract the ZIP to a normal folder.
+4. Double-click:
+   `Run_GPX_SHP_Converter.bat`
+
+You can also launch `GPX_SHP_Converter.exe` directly.
+
+The converter will open locally in your web browser.
+
+### macOS
+
+1. Open the latest GitHub Release.
+2. Download the file named similar to:
+   `GPX_SHP_Converter_macOS_vX.X.X.zip`
+3. Extract the ZIP.
+4. Double-click:
+   `Run_GPX_SHP_Converter.command`
+
+If macOS blocks the launcher because the app is unsigned:
+
+1. Right-click `Run_GPX_SHP_Converter.command`.
+2. Choose **Open**.
+3. Confirm **Open** when prompted.
+
+The converter runs locally on your Mac and opens in your default browser.
+
+> Windows and macOS use separate release packages. Do not use the Windows ZIP on a Mac or the macOS ZIP on Windows.
+
+## Basic workflow
+
+1. Upload one or more GPX files.
+2. Choose:
+   - **Consolidated** — one shapefile containing all uploaded GPX/GEOREF features.
+   - **Individual** — one shapefile per uploaded GPX file.
+3. Optional: enable **Attach parcel attributes from CSV**.
+4. If CSV mode is enabled:
+   - the CSV must contain `GEOREF ID`;
+   - every uploaded GPX filename must exist in `GEOREF ID`;
+   - the `.gpx` extension is ignored when matching;
+   - if even one GPX is missing from the CSV, conversion is blocked.
+5. Click **Convert files**.
+6. Download the generated ZIP.
+
 ## Data model
 
 The converter treats the GPX file as the physical georeferenced parcel:
 
 - **1 GPX filename = 1 GEOREF ID = 1 shapefile feature**
 - Multiple CSV rows with the same GEOREF ID are valid.
-- These repeated rows can represent rotational or multiple cropping records for the same parcel.
+- These repeated rows may represent rotational or multiple cropping records for the same parcel.
 - Crop/planting rows do **not** duplicate the geometry.
 
 When CSV attributes are enabled, the output ZIP contains:
 
 - the shapefile with parcel/farmer-level attributes;
-- **crop_records.csv**, containing every matching CSV row for the converted GEOREF IDs.
+- summary crop fields in the shapefile:
+  - `COMMODITY`
+  - `PLANT_FROM`
+  - `PLANT_TO`
+  - `CROP_ROWS`
+- `crop_records.csv`, containing every matching CSV row for the converted GEOREF IDs.
+
+Example:
+
+```text
+GEOREF ID: ABC001
+COMMODITY: Rice/Palay; Corn
+PLANT_FROM: June; January
+PLANT_TO: December; April
+CROP_ROWS: 2
+```
+
+The exact source rows are still preserved in `crop_records.csv`.
 
 ## Current features
 
 - Convert one or many GPX files.
 - Fixed output CRS: **EPSG:4326 / WGS 84**.
-- Consolidated mode: one shapefile containing one feature per uploaded GPX/GEOREF.
-- Individual mode: one shapefile folder per uploaded GPX/GEOREF.
+- Consolidated mode.
+- Individual mode.
 - Optional CSV attribute attachment using **GEOREF ID**.
-- Strict validation: if any uploaded GPX filename is missing from GEOREF ID, conversion is blocked.
-- Multiple crop rows for one GEOREF ID are preserved in the related crop table.
+- Strict validation when CSV mode is enabled.
+- One geometry per GPX / GEOREF ID.
 - Multiple GPX tracks/segments in one file are combined into one multipart geometry.
-- Files are processed locally by the application.
+- Commodity and planting summaries are visible directly in the shapefile.
+- Full crop/planting records are preserved in `crop_records.csv`.
+- Local-only processing.
 
 ## CSV matching
 
+Example:
+
+```text
+R06-79-02-008-000001.gpx
+```
+
+matches:
+
+```text
+GEOREF ID = R06-79-02-008-000001
+```
+
+Rules:
+
 1. The CSV must contain **GEOREF ID**.
-2. GPX filenames are matched without the .gpx extension.
-3. Example: **R06-79-02-008-000001.gpx** matches **R06-79-02-008-000001**.
-4. Every uploaded GPX must have at least one CSV match.
-5. Extra CSV rows are allowed.
-6. Multiple rows for a matched GEOREF ID are valid and all are exported to **crop_records.csv**.
+2. GPX filenames are matched without the `.gpx` extension.
+3. Every uploaded GPX must have at least one CSV match.
+4. Extra CSV rows are allowed.
+5. Multiple rows for the same matched GEOREF ID are valid and preserved as crop records.
 
-Parcel-level attributes such as RSBSA ID, parcel ID, farm type, area, ownership, and location are written to the shapefile DBF. The shapefile also includes summary fields `COMMODITY`, `PLANT_FROM`, `PLANT_TO`, and `CROP_ROWS`, with multiple values joined by semicolons. The exact row-by-row crop and planting records are still preserved in `crop_records.csv`.
+## Output CRS
 
-## Tech stack
+All shapefiles use:
 
-- Python
-- Streamlit
-- gpxpy
-- pandas
-- GeoPandas
-- Shapely
-- Pyogrio / GDAL
-- PyProj
-- pytest
+**EPSG:4326 — WGS 84**
 
-## Run locally
+## Running from source
 
-1. Create a virtual environment.
-2. Install dependencies with: pip install -r requirements.txt
-3. Start the app with: streamlit run app.py
+Developers can still run the project with Python:
 
-## Output
+```bash
+python -m venv .venv
+pip install -r requirements.txt
+streamlit run app.py
+```
 
-A Shapefile is made up of several files, commonly including .shp, .shx, .dbf, and .prj. These are automatically packaged into ZIP files.
+## Building desktop releases
 
-When CSV attributes are used, the ZIP also includes **crop_records.csv**.
+The repository includes automated GitHub Actions packaging for:
 
-## CRS
+- Windows
+- macOS
 
-All outputs use **EPSG:4326 — WGS 84**.
+Changing `RELEASE_VERSION` triggers both builds and creates a GitHub Release with separate downloadable ZIP files.
 
-
-## Windows distribution
-
-End users do not need Python installed.
-
-For Windows, build the application once using `build_windows.bat`. It creates a PyInstaller one-folder package under `dist\GPX_SHP_Converter`. Distribute that entire folder to users. They can double-click `GPX_SHP_Converter.exe` or use `Run_GPX_SHP_Converter.bat`.
-
-See `WINDOWS_DISTRIBUTION.md` for details.
+See `WINDOWS_DISTRIBUTION.md` for additional Windows packaging notes.
