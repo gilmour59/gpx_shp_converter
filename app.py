@@ -7,8 +7,9 @@ import streamlit as st
 from src.converter import OUTPUT_CRS, features_to_gdf
 from src.csv_attributes import (
     CSVValidationError,
-    build_attribute_lookup,
+    build_parcel_attribute_lookup,
     read_attribute_csv,
+    related_crop_records,
     validate_gpx_files_in_csv,
 )
 from src.exporter import individual_shapefiles_to_zip, shapefile_to_zip
@@ -47,10 +48,10 @@ uploaded_files = st.file_uploader(
 )
 
 attach_csv = st.checkbox(
-    "Attach attributes from CSV",
+    "Attach parcel attributes from CSV",
     help=(
-        "When enabled, every uploaded GPX filename must match a value in the "
-        "CSV GEOREF ID column. The .gpx extension is ignored when matching."
+        "Every uploaded GPX filename must match a value in the CSV GEOREF ID "
+        "column. Multiple CSV rows for one GEOREF ID are allowed."
     ),
 )
 
@@ -61,8 +62,8 @@ if attach_csv:
         type=["csv"],
         accept_multiple_files=False,
         help=(
-            "The CSV must contain a GEOREF ID column. Example: "
-            "R06-79-02-008-000001.gpx matches GEOREF ID R06-79-02-008-000001."
+            "The CSV must contain GEOREF ID. Multiple rows for the same GEOREF "
+            "may represent rotational or multiple cropping."
         ),
     )
 
@@ -71,16 +72,16 @@ mode = st.radio(
     options=["Consolidated", "Individual"],
     horizontal=True,
     captions=[
-        "Create one shapefile containing features from all valid GPX files.",
-        "Create a separate shapefile for every valid GPX file.",
+        "Create one shapefile containing one feature per uploaded GPX/GEOREF.",
+        "Create a separate shapefile for every uploaded GPX/GEOREF.",
     ],
 )
 
 parsed_uploads: list[ParsedUpload] = []
 errors: list[str] = []
 csv_blocking_errors: list[str] = []
-csv_warnings: list[str] = []
 attribute_lookup: dict[str, dict[str, str]] | None = None
+attribute_df = None
 
 if uploaded_files:
     for upload in uploaded_files:
@@ -100,8 +101,8 @@ if uploaded_files:
     for parsed in parsed_uploads:
         point_count = sum(feature.point_count for feature in parsed.features)
         st.success(
-            f"{parsed.filename} — {len(parsed.features)} feature(s), "
-            f"{point_count:,} GPS point(s)"
+            f"{parsed.filename} — {len(parsed.features)} track segment(s), "
+            f"{point_count:,} GPS point(s) → 1 shapefile feature"
         )
 
     for error in errors:
@@ -118,7 +119,7 @@ if attach_csv:
             attribute_df = read_attribute_csv(csv_file.getvalue())
 
             all_uploaded_names = [upload.name for upload in uploaded_files]
-            missing, duplicates = validate_gpx_files_in_csv(
+            missing, multiple_records = validate_gpx_files_in_csv(
                 all_uploaded_names,
                 attribute_df,
             )
@@ -133,25 +134,23 @@ if attach_csv:
                 )
                 st.code("\n".join(missing), language=None)
             else:
-                attribute_lookup = build_attribute_lookup(attribute_df)
+                attribute_lookup = build_parcel_attribute_lookup(attribute_df)
                 st.success(
                     f"All {len(all_uploaded_names)} uploaded GPX file(s) were found "
                     "in the CSV GEOREF ID column."
                 )
 
-            if duplicates:
-                csv_warnings.append(
-                    "Some GEOREF IDs occur more than once in the CSV."
+            if multiple_records:
+                st.info(
+                    "Some GEOREF IDs have multiple CSV rows. These are treated as "
+                    "one parcel geometry with multiple crop/planting records. "
+                    "All rows will be preserved in crop_records.csv."
                 )
-                st.warning(
-                    "Duplicate GEOREF ID matches were found. Conversion can continue, "
-                    "but the first matching CSV row will be used for attributes."
-                )
-                duplicate_lines = [
-                    f"{filename}: {count} CSV rows"
-                    for filename, count in duplicates.items()
+                lines = [
+                    f"{filename}: {count} crop/attribute rows"
+                    for filename, count in multiple_records.items()
                 ]
-                st.code("\n".join(duplicate_lines), language=None)
+                st.code("\n".join(lines), language=None)
 
         except CSVValidationError as exc:
             csv_blocking_errors.append(str(exc))
@@ -181,33 +180,56 @@ if st.button(
                 all_features,
                 attribute_lookup=attribute_lookup,
             )
-            output = shapefile_to_zip(gdf, "consolidated_gpx")
+            related = (
+                related_crop_records(
+                    attribute_df,
+                    [parsed.filename for parsed in parsed_uploads],
+                )
+                if attach_csv and attribute_df is not None
+                else None
+            )
+            output = shapefile_to_zip(
+                gdf,
+                "consolidated_gpx",
+                related_csv=related,
+            )
             filename = "consolidated_gpx.zip"
             label = "Download consolidated shapefile"
             feature_count = len(gdf)
         else:
-            converted = [
-                (
-                    parsed.filename,
-                    features_to_gdf(
-                        parsed.features,
-                        attribute_lookup=attribute_lookup,
-                    ),
+            converted = []
+            for parsed in parsed_uploads:
+                related = (
+                    related_crop_records(attribute_df, [parsed.filename])
+                    if attach_csv and attribute_df is not None
+                    else None
                 )
-                for parsed in parsed_uploads
-            ]
+                converted.append(
+                    (
+                        parsed.filename,
+                        features_to_gdf(
+                            parsed.features,
+                            attribute_lookup=attribute_lookup,
+                        ),
+                        related,
+                    )
+                )
+
             output = individual_shapefiles_to_zip(converted)
             filename = "converted_shapefiles.zip"
             label = "Download all shapefiles"
-            feature_count = sum(len(gdf) for _, gdf in converted)
+            feature_count = sum(len(gdf) for _, gdf, _ in converted)
 
     st.success(
-        f"Conversion complete: {len(parsed_uploads)} file(s), "
-        f"{feature_count} feature(s), CRS {OUTPUT_CRS}."
+        f"Conversion complete: {len(parsed_uploads)} GPX file(s), "
+        f"{feature_count} shapefile feature(s), CRS {OUTPUT_CRS}."
     )
 
     if attach_csv:
-        st.caption("CSV attributes were attached by matching GPX filename to GEOREF ID.")
+        st.caption(
+            "Parcel-level attributes are stored in the shapefile. "
+            "All matched crop/planting rows are preserved in crop_records.csv."
+        )
 
     st.download_button(
         label,
@@ -225,19 +247,20 @@ with st.expander("How CSV matching works"):
 - The uploaded GPX filename is matched using its filename without the **.gpx** extension.
 - Example: **R06-79-02-008-000001.gpx** matches **R06-79-02-008-000001**.
 - If even one uploaded GPX file is missing from the CSV, conversion is blocked.
-- Extra CSV rows are allowed.
-- If a GEOREF ID appears more than once, the app warns the user and uses the first matching row.
-- CSV attributes are added to the shapefile DBF attributes.
+- Multiple CSV rows for one GEOREF ID are valid.
+- One GPX/GEOREF produces one geometry.
+- Parcel/farmer attributes are stored in the shapefile DBF.
+- All matching crop, commodity, and planting rows are preserved in **crop_records.csv**.
 """
     )
 
 with st.expander("What gets converted?"):
     st.markdown(
         """
-- GPX track segments are converted to Shapefile LineString features.
-- Each feature keeps its source filename, track name, track number, segment number, and point count.
-- In Consolidated mode, features from every GPX file are stored together in one shapefile.
-- In Individual mode, every GPX file gets its own shapefile folder inside one ZIP.
+- Each uploaded GPX becomes one shapefile feature.
+- If a GPX contains several tracks or segments, they are combined into one multipart line geometry.
+- In Consolidated mode, all uploaded GPX/GEOREF features are stored in one shapefile.
+- In Individual mode, every GPX gets its own shapefile folder inside one ZIP.
 - Routes, waypoints, polygons, elevation/time attributes, and map preview are planned for later releases.
 """
     )
