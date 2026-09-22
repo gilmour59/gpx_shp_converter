@@ -17,9 +17,9 @@ The output CRS is fixed to **EPSG:4326 / WGS 84**.
 - [x] Source filename and GPX track metadata
 - [x] ZIP Shapefile components
 - [x] Basic validation and friendly errors
-- [x] Initial automated tests
+- [x] Initial automated tests\n- [x] Optional CSV attribute import by GEOREF ID\n- [x] Block conversion when any GPX filename is missing from CSV
 
-## Phase 2 — User experience
+## Phase 2 — User experience\n\n- [ ] Improve duplicate GEOREF ID conflict handling\n- [ ] Add CSV match summary table
 
 - [ ] File summary table instead of one message per file
 - [ ] Conversion progress indicator
