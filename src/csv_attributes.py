@@ -10,9 +10,7 @@ from .gpx_parser import GPXFeature
 
 GEOREF_COLUMN = "GEOREF ID"
 
-# ESRI Shapefile DBF field names are limited. These aliases keep the
-# important CSV attributes readable and unique in the exported shapefile.
-FIELD_ALIASES = {
+PARCEL_FIELD_ALIASES = {
     "GEOREF ID": "GEOREF_ID",
     "RSBSA ID": "RSBSA_ID",
     "FIRST NAME": "FIRST_NAME",
@@ -25,9 +23,6 @@ FIELD_ALIASES = {
     "RSBSA PARCEL ID": "PARCEL_ID",
     "PARCEL NAME": "PRCL_NAME",
     "FARM TYPE": "FARM_TYPE",
-    "COMMODITY": "COMMODITY",
-    "PLANTING SCHEDULE - FROM": "PLANT_FROM",
-    "PLANTING SCHEDULE - TO": "PLANT_TO",
     "DECLARED AREA (Ha)": "DECL_AREA",
     "VERIFIED AREA (Ha)": "VERIF_AREA",
     "TYPE OF OWNERSHIP": "OWN_TYPE",
@@ -49,7 +44,6 @@ class CSVValidationError(ValueError):
 
 
 def _normalize_georef(value: object) -> str:
-    """Normalize GEOREF values and GPX filenames to comparable IDs."""
     text = str(value).strip()
     if not text or text.lower() == "nan":
         return ""
@@ -59,12 +53,10 @@ def _normalize_georef(value: object) -> str:
 
 
 def gpx_georef_id(filename: str) -> str:
-    """Return the GPX filename basename used to match GEOREF ID."""
     return Path(filename).stem.strip()
 
 
 def read_attribute_csv(csv_bytes: bytes) -> pd.DataFrame:
-    """Read a CSV while preserving identifiers as strings."""
     try:
         df = pd.read_csv(io.BytesIO(csv_bytes), dtype=str, keep_default_na=False)
     except Exception as exc:
@@ -94,13 +86,12 @@ def validate_gpx_files_in_csv(
     """
     Validate that every GPX filename exists in GEOREF ID.
 
-    Returns:
-        missing filenames,
-        duplicate match counts keyed by original GPX filename.
+    Duplicate GEOREF IDs are valid and may represent rotational or multiple
+    crop records for the same physical parcel.
     """
     counts = df["_GEOREF_KEY"].value_counts()
     missing: list[str] = []
-    duplicates: dict[str, int] = {}
+    multiple_records: dict[str, int] = {}
 
     for filename in filenames:
         key = _normalize_georef(gpx_georef_id(filename))
@@ -109,60 +100,64 @@ def validate_gpx_files_in_csv(
         if match_count == 0:
             missing.append(filename)
         elif match_count > 1:
-            duplicates[filename] = match_count
+            multiple_records[filename] = match_count
 
-    return missing, duplicates
+    return missing, multiple_records
 
 
-def build_attribute_lookup(df: pd.DataFrame) -> dict[str, dict[str, str]]:
+def _first_nonempty(values: pd.Series) -> str:
+    for value in values.astype(str):
+        value = value.strip()
+        if value:
+            return value
+    return ""
+
+
+def build_parcel_attribute_lookup(
+    df: pd.DataFrame,
+) -> dict[str, dict[str, str]]:
     """
-    Build one attribute row per GEOREF ID.
+    Build one parcel-level attribute row per GEOREF ID.
 
-    Duplicate GEOREF IDs use the first CSV row to avoid multiplying geometry.
-    The UI reports duplicate matches to the user before conversion.
+    Multiple crop rows for the same GEOREF ID do not duplicate geometry.
     """
     lookup: dict[str, dict[str, str]] = {}
 
-    for _, row in df.iterrows():
-        key = row["_GEOREF_KEY"]
-        if not key or key in lookup:
+    for key, group in df.groupby("_GEOREF_KEY", sort=False):
+        if not key:
             continue
 
         attributes: dict[str, str] = {}
+        for csv_column, shp_column in PARCEL_FIELD_ALIASES.items():
+            if csv_column in group.columns:
+                attributes[shp_column] = _first_nonempty(group[csv_column])
 
-        for csv_column, shp_column in FIELD_ALIASES.items():
-            if csv_column in df.columns:
-                attributes[shp_column] = str(row[csv_column]).strip()
-
-        # Preserve additional, previously unknown columns with safe aliases.
-        used_names = set(attributes)
-        for column in df.columns:
-            if column == "_GEOREF_KEY" or column in FIELD_ALIASES:
-                continue
-
-            base = "".join(ch if ch.isalnum() else "_" for ch in column.upper())
-            base = base.strip("_") or "FIELD"
-            base = base[:10]
-
-            candidate = base
-            suffix = 1
-            while candidate in used_names:
-                suffix_text = str(suffix)
-                candidate = f"{base[:10-len(suffix_text)]}{suffix_text}"
-                suffix += 1
-
-            used_names.add(candidate)
-            attributes[candidate] = str(row[column]).strip()
-
+        attributes["CROP_ROWS"] = str(len(group))
         lookup[key] = attributes
 
     return lookup
+
+
+def related_crop_records(
+    df: pd.DataFrame,
+    filenames: list[str],
+) -> pd.DataFrame:
+    """
+    Return every original CSV row related to the uploaded GPX files.
+
+    This preserves one-to-many commodity/planting records for each GEOREF ID.
+    """
+    wanted_keys = {
+        _normalize_georef(gpx_georef_id(filename))
+        for filename in filenames
+    }
+    related = df[df["_GEOREF_KEY"].isin(wanted_keys)].copy()
+    return related.drop(columns=["_GEOREF_KEY"], errors="ignore")
 
 
 def attributes_for_feature(
     feature: GPXFeature,
     lookup: dict[str, dict[str, str]],
 ) -> dict[str, str]:
-    """Return CSV attributes for a GPX feature based on source filename."""
     key = _normalize_georef(gpx_georef_id(feature.source_file))
     return lookup.get(key, {})
