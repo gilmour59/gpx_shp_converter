@@ -1,0 +1,87 @@
+name: Build Windows Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - RELEASE_VERSION
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read release version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content RELEASE_VERSION -Raw).Trim()
+          if (-not $version.StartsWith("v")) { $version = "v$version" }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Build Windows application
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --name "GPX_SHP_Converter" --onedir --collect-all streamlit --collect-all geopandas --collect-all pyogrio --collect-all pyproj --collect-all shapely --add-data "app.py;." --add-data "src;src" windows_launcher.py
+          Copy-Item "Run_GPX_SHP_Converter.bat" "dist\GPX_SHP_Converter\Run_GPX_SHP_Converter.bat"
+
+      - name: Create release ZIP
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $zipName = "GPX_SHP_Converter_Windows_$version.zip"
+          Compress-Archive -Path "dist\GPX_SHP_Converter\*" -DestinationPath $zipName
+          "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $notes = @"
+          ## GPX to SHP Converter $version
+
+          Windows local release.
+
+          ### For end users
+          1. Download **$env:ZIP_NAME**.
+          2. Extract the ZIP to a folder.
+          3. Double-click **Run_GPX_SHP_Converter.bat** or **GPX_SHP_Converter.exe**.
+          4. The converter opens locally in the default web browser.
+
+          Python does not need to be installed on the end-user computer.
+
+          ### Current features
+          - EPSG:4326 / WGS 84 output
+          - Consolidated or individual GPX-to-Shapefile conversion
+          - Optional CSV matching using GEOREF ID
+          - Every uploaded GPX must exist in the CSV when CSV mode is enabled
+          - One geometry per GPX / GEOREF ID
+          - Commodity and planting summaries in the shapefile
+          - Full crop/planting rows preserved in crop_records.csv
+          "@
+          gh release create $version $env:ZIP_NAME --target $env:GITHUB_SHA --title "GPX to SHP Converter $version" --notes $notes
