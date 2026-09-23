@@ -104,12 +104,16 @@ jobs:
           cp Run_GPX_SHP_Converter.command dist/GPX_SHP_Converter/Run_GPX_SHP_Converter.command
           chmod +x dist/GPX_SHP_Converter/Run_GPX_SHP_Converter.command
           chmod +x dist/GPX_SHP_Converter/GPX_SHP_Converter
-      - name: Smoke test packaged macOS app
+      - name: Smoke test quarantined macOS download
         shell: bash
         run: |
           export GPX_SHP_PORT=8765
           export GPX_SHP_NO_BROWSER=1
-          dist/GPX_SHP_Converter/GPX_SHP_Converter > macos-app.log 2>&1 &
+
+          # Simulate Gatekeeper quarantine from a browser/GitHub download.
+          xattr -wr com.apple.quarantine "0081;00000000;GitHub;00000000-0000-0000-0000-000000000000" dist/GPX_SHP_Converter || true
+
+          dist/GPX_SHP_Converter/Run_GPX_SHP_Converter.command > macos-app.log 2>&1 &
           APP_PID=$!
 
           OK=0
@@ -135,7 +139,13 @@ jobs:
             exit 1
           fi
 
-          echo "macOS packaged app smoke test passed."
+          if xattr -p com.apple.quarantine dist/GPX_SHP_Converter/GPX_SHP_Converter >/dev/null 2>&1; then
+            echo "Quarantine attribute was not cleared from the packaged executable."
+            kill "$APP_PID" 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "Quarantined macOS launcher smoke test passed."
           kill "$APP_PID" 2>/dev/null || true
       - name: Create macOS release ZIP
         shell: bash
