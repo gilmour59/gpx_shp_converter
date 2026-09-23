@@ -28,11 +28,16 @@ The converter automatically chooses an available local port and opens the correc
 4. Double-click:
    `Run_GPX_SHP_Converter.command`
 
-If macOS blocks the launcher because the app is unsigned:
+Because the current macOS release is not yet Apple Developer-ID notarized, macOS may show a security warning after download.
+
+Use this startup method:
 
 1. Right-click `Run_GPX_SHP_Converter.command`.
 2. Choose **Open**.
-3. Confirm **Open** when prompted.
+3. Confirm **Open** if macOS asks.
+4. The launcher clears the quarantine attribute from this extracted converter folder, then starts the app.
+
+If you previously saw **“Python.framework is damaged and can’t be opened”**, delete that older extracted folder and use the latest release instead.
 
 The converter automatically chooses an available local port and opens the correct address in your browser. It usually starts at port 8501, but if that port is already in use it will try the next available port.
 
@@ -161,3 +166,10 @@ Examples:
 - If 8501 and 8502 are both in use → it may open on 8503.
 
 The browser is opened automatically using the selected port.
+
+
+## macOS security note
+
+The macOS release is currently ad-hoc packaged rather than Apple Developer-ID signed and notarized. The included `Run_GPX_SHP_Converter.command` removes the macOS quarantine attribute only from its own extracted converter folder before launch.
+
+For a fully seamless macOS installation with no Gatekeeper workaround, the project will need an Apple Developer ID certificate and Apple notarization.
