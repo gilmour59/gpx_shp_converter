@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import socket
 import sys
 import threading
@@ -21,9 +22,20 @@ def resource_path(relative_path: str) -> Path:
 
 
 def find_available_port() -> int:
+    requested_port = os.getenv("GPX_SHP_PORT", "").strip()
+    if requested_port:
+        port = int(requested_port)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            try:
+                sock.bind((HOST, port))
+            except OSError as exc:
+                raise RuntimeError(
+                    f"Requested local port {port} is already in use."
+                ) from exc
+        return port
+
     for port in range(START_PORT, END_PORT + 1):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
                 sock.bind((HOST, port))
                 return port
@@ -52,11 +64,12 @@ def main() -> None:
     app_path = resource_path("app.py")
     port = find_available_port()
 
-    threading.Thread(
-        target=open_browser_when_ready,
-        args=(port,),
-        daemon=True,
-    ).start()
+    if os.getenv("GPX_SHP_NO_BROWSER") != "1":
+        threading.Thread(
+            target=open_browser_when_ready,
+            args=(port,),
+            daemon=True,
+        ).start()
 
     sys.argv = [
         "streamlit",
