@@ -60,7 +60,31 @@ def open_browser_when_ready(port: int) -> None:
             time.sleep(0.5)
 
 
+def validate_packaged_runtime() -> None:
+    app_root = resource_path(".")
+    app_root_str = str(app_root)
+    if app_root_str not in sys.path:
+        sys.path.insert(0, app_root_str)
+
+    # Streamlit executes app.py dynamically, so PyInstaller cannot infer all
+    # imports from it. Import the application dependency graph explicitly so
+    # missing frozen modules fail immediately and are caught by CI.
+    import gpxpy  # noqa: F401
+    import pandas  # noqa: F401
+    import geopandas  # noqa: F401
+    import shapely  # noqa: F401
+    import pyogrio  # noqa: F401
+    import pyproj  # noqa: F401
+
+    from src import converter  # noqa: F401
+    from src import csv_attributes  # noqa: F401
+    from src import exporter  # noqa: F401
+    from src import gpx_parser  # noqa: F401
+
+
 def main() -> None:
+    validate_packaged_runtime()
+
     app_path = resource_path("app.py")
     port = find_available_port()
 
