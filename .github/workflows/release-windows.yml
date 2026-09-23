@@ -29,7 +29,7 @@ jobs:
       - name: Build Windows package
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --name "GPX_SHP_Converter" --onedir --collect-all streamlit --collect-all geopandas --collect-all pyogrio --collect-all pyproj --collect-all shapely --copy-metadata streamlit --add-data "app.py;." --add-data "src;src" windows_launcher.py
+          pyinstaller --noconfirm --clean --name "GPX_SHP_Converter" --onedir --collect-all streamlit --collect-all gpxpy --collect-all pandas --collect-all geopandas --collect-all pyogrio --collect-all pyproj --collect-all shapely --copy-metadata streamlit --add-data "app.py;." --add-data "src;src" windows_launcher.py
           Copy-Item "Run_GPX_SHP_Converter.bat" "dist\GPX_SHP_Converter\Run_GPX_SHP_Converter.bat"
       - name: Smoke test packaged Windows app
         shell: pwsh
@@ -100,7 +100,7 @@ jobs:
       - name: Build macOS package
         shell: bash
         run: |
-          pyinstaller --noconfirm --clean --name "GPX_SHP_Converter" --onedir --collect-all streamlit --collect-all geopandas --collect-all pyogrio --collect-all pyproj --collect-all shapely --copy-metadata streamlit --add-data "app.py:." --add-data "src:src" macos_launcher.py
+          pyinstaller --noconfirm --clean --name "GPX_SHP_Converter" --onedir --collect-all streamlit --collect-all gpxpy --collect-all pandas --collect-all geopandas --collect-all pyogrio --collect-all pyproj --collect-all shapely --copy-metadata streamlit --add-data "app.py:." --add-data "src:src" macos_launcher.py
           cp Run_GPX_SHP_Converter.command dist/GPX_SHP_Converter/Run_GPX_SHP_Converter.command
           chmod +x dist/GPX_SHP_Converter/Run_GPX_SHP_Converter.command
           chmod +x dist/GPX_SHP_Converter/GPX_SHP_Converter
