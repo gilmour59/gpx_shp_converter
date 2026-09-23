@@ -29,8 +29,51 @@ jobs:
       - name: Build Windows package
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --name "GPX_SHP_Converter" --onedir --collect-all streamlit --collect-all geopandas --collect-all pyogrio --collect-all pyproj --collect-all shapely --add-data "app.py;." --add-data "src;src" windows_launcher.py
+          pyinstaller --noconfirm --clean --name "GPX_SHP_Converter" --onedir --collect-all streamlit --collect-all geopandas --collect-all pyogrio --collect-all pyproj --collect-all shapely --copy-metadata streamlit --add-data "app.py;." --add-data "src;src" windows_launcher.py
           Copy-Item "Run_GPX_SHP_Converter.bat" "dist\GPX_SHP_Converter\Run_GPX_SHP_Converter.bat"
+      - name: Smoke test packaged Windows app
+        shell: pwsh
+        run: |
+          $env:GPX_SHP_PORT = "8765"
+          $env:GPX_SHP_NO_BROWSER = "1"
+          $stdout = Join-Path $PWD "windows-app.stdout.log"
+          $stderr = Join-Path $PWD "windows-app.stderr.log"
+          $process = Start-Process -FilePath "dist\GPX_SHP_Converter\GPX_SHP_Converter.exe" -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+
+          $ok = $false
+          for ($i = 0; $i -lt 40; $i++) {
+            Start-Sleep -Seconds 1
+
+            if ($process.HasExited) {
+              Write-Host "Packaged Windows app exited early with code $($process.ExitCode)"
+              if (Test-Path $stdout) { Get-Content $stdout }
+              if (Test-Path $stderr) { Get-Content $stderr }
+              exit 1
+            }
+
+            try {
+              $response = Invoke-WebRequest -Uri "http://127.0.0.1:8765" -UseBasicParsing -TimeoutSec 2
+              if ($response.StatusCode -eq 200) {
+                $ok = $true
+                break
+              }
+            } catch {
+            }
+          }
+
+          if (-not $ok) {
+            Write-Host "Packaged Windows app did not become reachable."
+            if (Test-Path $stdout) { Get-Content $stdout }
+            if (Test-Path $stderr) { Get-Content $stderr }
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            exit 1
+          }
+
+          Write-Host "Windows packaged app smoke test passed."
+          Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+      - name: Create Windows release ZIP
+        shell: pwsh
+        run: |
           $version = (Get-Content RELEASE_VERSION -Raw).Trim()
           if (-not $version.StartsWith("v")) { $version = "v$version" }
           Compress-Archive -Path "dist\GPX_SHP_Converter\*" -DestinationPath "GPX_SHP_Converter_Windows_$version.zip"
@@ -57,10 +100,46 @@ jobs:
       - name: Build macOS package
         shell: bash
         run: |
-          pyinstaller --noconfirm --clean --name "GPX_SHP_Converter" --onedir --collect-all streamlit --collect-all geopandas --collect-all pyogrio --collect-all pyproj --collect-all shapely --add-data "app.py:." --add-data "src:src" macos_launcher.py
+          pyinstaller --noconfirm --clean --name "GPX_SHP_Converter" --onedir --collect-all streamlit --collect-all geopandas --collect-all pyogrio --collect-all pyproj --collect-all shapely --copy-metadata streamlit --add-data "app.py:." --add-data "src:src" macos_launcher.py
           cp Run_GPX_SHP_Converter.command dist/GPX_SHP_Converter/Run_GPX_SHP_Converter.command
           chmod +x dist/GPX_SHP_Converter/Run_GPX_SHP_Converter.command
           chmod +x dist/GPX_SHP_Converter/GPX_SHP_Converter
+      - name: Smoke test packaged macOS app
+        shell: bash
+        run: |
+          export GPX_SHP_PORT=8765
+          export GPX_SHP_NO_BROWSER=1
+          dist/GPX_SHP_Converter/GPX_SHP_Converter > macos-app.log 2>&1 &
+          APP_PID=$!
+
+          OK=0
+          for i in {1..40}; do
+            sleep 1
+
+            if ! kill -0 "$APP_PID" 2>/dev/null; then
+              echo "Packaged macOS app exited early."
+              cat macos-app.log || true
+              exit 1
+            fi
+
+            if curl --fail --silent --max-time 2 http://127.0.0.1:8765 >/dev/null; then
+              OK=1
+              break
+            fi
+          done
+
+          if [ "$OK" -ne 1 ]; then
+            echo "Packaged macOS app did not become reachable."
+            cat macos-app.log || true
+            kill "$APP_PID" 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "macOS packaged app smoke test passed."
+          kill "$APP_PID" 2>/dev/null || true
+      - name: Create macOS release ZIP
+        shell: bash
+        run: |
           VERSION=$(tr -d '\r\n ' < RELEASE_VERSION)
           [[ "$VERSION" == v* ]] || VERSION="v$VERSION"
           ditto -c -k --sequesterRsrc --keepParent dist/GPX_SHP_Converter "GPX_SHP_Converter_macOS_$VERSION.zip"
@@ -90,7 +169,9 @@ jobs:
             --title "GPX to SHP Converter $VERSION" \
             --notes "Desktop release for Windows and macOS.
 
-          For Windows: download the Windows ZIP, extract it, then open Run_GPX_SHP_Converter.bat or GPX_SHP_Converter.exe.
+          This release passed both unit tests and a packaged-app smoke test on GitHub's Windows/macOS runners.
+
+          For Windows: download the Windows ZIP, extract it, then open Run_GPX_SHP_Converter.bat.
 
           For macOS: download the macOS ZIP, extract it, then open Run_GPX_SHP_Converter.command. If macOS blocks it because it is unsigned, right-click the file, choose Open, then confirm.
 
