@@ -75,6 +75,7 @@ def main() -> None:
         "streamlit",
         "run",
         str(app_path),
+        "--global.developmentMode=false",
         "--server.headless=true",
         f"--server.address={HOST}",
         f"--server.port={port}",
