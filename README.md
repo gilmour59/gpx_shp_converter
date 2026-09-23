@@ -17,7 +17,7 @@ You do **not** need Python installed if you use a packaged release.
 
 You can also launch `GPX_SHP_Converter.exe` directly.
 
-The converter should open automatically in your web browser at **http://localhost:8501**. If it does not open automatically, type that exact address in your browser. **Do not use localhost:3000.**
+The converter automatically chooses an available local port and opens the correct address in your browser. It usually starts at port 8501, but if that port is already in use it will try the next available port.
 
 ### macOS
 
@@ -34,7 +34,7 @@ If macOS blocks the launcher because the app is unsigned:
 2. Choose **Open**.
 3. Confirm **Open** when prompted.
 
-The converter runs locally on your Mac and should open automatically at **http://localhost:8501**. If needed, open that exact address manually. **Do not use localhost:3000.**
+The converter automatically chooses an available local port and opens the correct address in your browser. It usually starts at port 8501, but if that port is already in use it will try the next available port.
 
 > Windows and macOS use separate release packages. Do not use the Windows ZIP on a Mac or the macOS ZIP on Windows.
 
@@ -146,3 +146,18 @@ The repository includes automated GitHub Actions packaging for:
 Changing `RELEASE_VERSION` triggers both builds and creates a GitHub Release with separate downloadable ZIP files.
 
 See `WINDOWS_DISTRIBUTION.md` for additional Windows packaging notes.
+
+
+## Local port behavior
+
+The packaged app does not require a fixed port.
+
+It checks ports from **8501 through 8599** and uses the first available one. This avoids conflicts with other Streamlit apps already running on the computer.
+
+Examples:
+
+- If 8501 is free → the app opens on port 8501.
+- If 8501 is already in use → it may open on 8502.
+- If 8501 and 8502 are both in use → it may open on 8503.
+
+The browser is opened automatically using the selected port.
