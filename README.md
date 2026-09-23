@@ -17,7 +17,7 @@ You do **not** need Python installed if you use a packaged release.
 
 You can also launch `GPX_SHP_Converter.exe` directly.
 
-The converter will open locally in your web browser.
+The converter should open automatically in your web browser at **http://localhost:8501**. If it does not open automatically, type that exact address in your browser. **Do not use localhost:3000.**
 
 ### macOS
 
@@ -34,7 +34,7 @@ If macOS blocks the launcher because the app is unsigned:
 2. Choose **Open**.
 3. Confirm **Open** when prompted.
 
-The converter runs locally on your Mac and opens in your default browser.
+The converter runs locally on your Mac and should open automatically at **http://localhost:8501**. If needed, open that exact address manually. **Do not use localhost:3000.**
 
 > Windows and macOS use separate release packages. Do not use the Windows ZIP on a Mac or the macOS ZIP on Windows.
 
